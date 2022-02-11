@@ -12,6 +12,24 @@ class Mysql:
         self.cursor = conn.cursor()
         self.fetch_result = None
 
+    def defense_xxs(self, bind):
+        """ def description : xxs 방어 
+
+        Parameters : 
+        bind : 바인드(tuple)
+
+        Returns
+        -------
+        bind: 방어 적용 된 bind (tuple)
+        """
+        bind_new = ()
+        for val in bind:
+            val = val.replace("<", "&lt")
+            val = val.replace(">", "&gt")
+            bind_new += (val,)
+
+        return bind_new
+
     def format_read_one(self):
         """ def description : read_one 포멧팅
 
@@ -26,7 +44,7 @@ class Mysql:
 
         return row_dict
 
-    def read_one(self, query, bind=None):
+    def read_one(self, query, bind):
         """ def description : 데이터 단일 조회 
 
         Parameters : 
@@ -40,11 +58,7 @@ class Mysql:
 
         try:
             # 쿼리 실행
-            if bind:
-                self.cursor.execute(query, bind)
-
-            else:
-                self.cursor.execute(query)
+            self.cursor.execute(query, self.defense_xxs(bind))
 
             # 데이터 조회 및 결과 리턴
             self.fetch_result = self.cursor.fetchone()
@@ -95,7 +109,7 @@ class Mysql:
 
         return row_list
 
-    def read_all(self, query, bind=None):
+    def read_all(self, query, bind):
         """ def description : 데이터 복수 조회 
 
         Parameters : 
@@ -107,12 +121,7 @@ class Mysql:
         """
 
         try:
-            # 쿼리 실행
-            if bind:
-                self.cursor.execute(query, bind)
-
-            else:
-                self.cursor.execute(query)
+            self.cursor.execute(query, self.defense_xxs(bind))
 
             # 데이터 조회 및 결과 리턴
             self.fetch_result = self.cursor.fetchall()
@@ -158,16 +167,21 @@ class Mysql:
 
         try:
 
-            if query or query_bulk:
+            if not query and not query_bulk:
+                response_object = {
+                    "status": "fail",
+                    "message": "param should have query or query_bulk"
+                }
+                return response_object
 
-                # 단일 케이스
-                if query:
+            # 단일 케이스
+            if query:
+                self.cursor.execute(query)
+
+            # 복수 케이스
+            elif query_bulk:
+                for query in query_bulk:
                     self.cursor.execute(query)
-
-                # 복수 케이스
-                elif query_bulk:
-                    for query in query_bulk:
-                        self.cursor.execute(query)
 
             response_object = {
                 "status": "success",
@@ -198,25 +212,31 @@ class Mysql:
         """
 
         try:
+
+            if not query and not query_bulk:
+                response_object = {
+                    "status": "fail",
+                    "message": "param should have query or query_bulk"
+                }
+                return response_object
+
             lastrowids = []
 
-            if query or query_bulk:
+            # 단일 케이스
+            if query:
+                self.cursor.execute(query)
+                if str(query.lower()).find("insert") >= 0:
+                    lastrowids.append(self.cursor.lastrowid)
 
-                # 단일 케이스
-                if query:
+            # 복수 케이스
+            elif query_bulk:
+                for query in query_bulk:
                     self.cursor.execute(query)
+
                     if str(query.lower()).find("insert") >= 0:
                         lastrowids.append(self.cursor.lastrowid)
 
-                # 복수 케이스
-                elif query_bulk:
-                    for query in query_bulk:
-                        self.cursor.execute(query)
-
-                        if str(query.lower()).find("insert") >= 0:
-                            lastrowids.append(self.cursor.lastrowid)
-
-                self.conn.commit()
+            self.conn.commit()
 
             response_object = {
                 "status": "success",
