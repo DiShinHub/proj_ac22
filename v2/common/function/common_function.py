@@ -78,6 +78,30 @@ def generate_now_time():
     return now_time
 
 
+def generate_now_min():
+    """ 
+    def description : 현재 분 산출
+
+    Returns
+    -------
+    mm 분
+    """
+    mm = generate_now_time()[-5:-3]
+    return int(mm)
+
+
+def generate_now_sec():
+    """ 
+    def description : 현재 초 산출
+
+    Returns
+    -------
+    ss 초
+    """
+    ss = generate_now_time()[-2:]
+    return int(ss)
+
+
 def generate_micro_date():
     """ 
     def description : 오늘 날짜 마이크로 세컨드까지 산출 
@@ -150,3 +174,92 @@ def sort_by_current_price(data_list):
                 arr[j], arr[j + 1] = arr[j + 1], arr[j]
 
     return data_list
+
+
+def add_sec(target_time, sec):
+    """ def description : 타겟 시간에 초 추가
+
+    Parameters : 
+    target_time : 타겟 시간 (str, 23:59:59)
+    sec : 추가할 초(int)
+
+    Returns
+    -------
+    Boolean
+    """
+    if abs(int(sec)) >= 60:
+        return False
+
+    hh = int(target_time[0:2])
+    mm = int(target_time[3:5])
+    ss = int(target_time[6:8])
+
+    ss += sec
+    if sec > 0:
+
+        if ss >= 60:
+            ss = ss - 60
+            mm += 1
+
+        if mm >= 60:
+            mm = mm - 60
+            hh += 1
+
+        if hh >= 24:
+            hh = hh - 24
+
+    else:
+
+        if ss < 0:
+            ss = abs(ss + 60)
+            mm += -1
+
+        if mm < 0:
+            mm = abs(mm + 60)
+            hh += -1
+
+        if hh < 0:
+            hh = abs(hh + 24)
+
+    hh = str(hh).zfill(2)
+    mm = str(mm).zfill(2)
+    ss = str(ss).zfill(2)
+
+    result_time = f"{hh}:{mm}:{ss}"
+    return result_time
+
+
+def add_min(target_time, min):
+
+    if abs(int(min)) >= 60:
+        return False
+
+    hh = int(target_time[0:2])
+    mm = int(target_time[3:5])
+    ss = int(target_time[6:8])
+
+    mm += min
+    if mm > 0:
+
+        if mm >= 60:
+            mm = mm - 60
+            hh += 1
+
+        if hh >= 24:
+            hh = hh - 24
+
+    else:
+
+        if mm < 0:
+            mm = abs(mm + 60)
+            hh += -1
+
+        if hh < 0:
+            hh = abs(hh + 24)
+
+    hh = str(hh).zfill(2)
+    mm = str(mm).zfill(2)
+    ss = str(ss).zfill(2)
+
+    result_time = f"{hh}:{mm}:{ss}"
+    return result_time
