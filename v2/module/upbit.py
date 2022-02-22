@@ -438,7 +438,13 @@ class Upbit():
         if current_price < bollinger_bands["bot_bb"]:
             bollinger_state = "LB"
 
-        return bollinger_state
+        response = {
+            "bollinger_state": bollinger_state,
+            "top_bb": bollinger_bands["top_bb"],
+            "mid_bb": bollinger_bands["mid_bb"],
+            "bot_bb": bollinger_bands["bot_bb"]
+        }
+        return response
 
     def buy_coin(self, krw_order):
         """

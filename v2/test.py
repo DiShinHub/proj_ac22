@@ -1,15 +1,14 @@
-from module.upbit import *
 
 
-upbit = Upbit()
+data_list = []
 
-upbit.set_ticker("KRW-ETH")
+data_list.append(1)
+data_list.append(5)
+data_list.append(3)
 
-cp = upbit.get_current_price()
-print(cp)
 
-bb = upbit.get_bollinger_bands("minute5")
-print(bb)
+for data in (data_list):
 
-bs = upbit.get_bollinger_state("minute5")
-print(bs)
+    print(data)
+
+print(data_list)
