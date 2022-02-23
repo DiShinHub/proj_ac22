@@ -429,13 +429,13 @@ class Upbit():
         if current_price > bollinger_bands["top_bb"]:
             bollinger_state = "TB"
 
-        if current_price > bollinger_bands["mid_bb"]:
+        elif current_price > bollinger_bands["mid_bb"] and current_price <= bollinger_bands["top_bb"]:
             bollinger_state = "MH"
 
-        if current_price < bollinger_bands["mid_bb"]:
+        elif current_price < bollinger_bands["mid_bb"] and current_price >= bollinger_bands["bot_bb"]:
             bollinger_state = "ML"
 
-        if current_price < bollinger_bands["bot_bb"]:
+        elif current_price < bollinger_bands["bot_bb"]:
             bollinger_state = "LB"
 
         response = {

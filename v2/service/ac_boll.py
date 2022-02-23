@@ -10,11 +10,14 @@ class AcBoll:
 
     def __init__(self):
 
-        # 개발 중
         self.upbit = Upbit()
         self.slack = Slack()
         self.log = Log()
 
+        # 루프 활성화 상태
+        self.loop_activate = True
+
+        # 코인 기본 변수
         self.ticker = None                  # 티커
         self.current_price = 0              # 현재가
         self.bollinger_state = None         # 볼린저 현 상태
@@ -24,34 +27,55 @@ class AcBoll:
         self.action_state = None            # 매수 / 매도 상태
 
         # 상단 볼린저 브레이크
+        self.tb_price = 0                   # tb 당시 가격
         self.tb_emergency_flag = False      # 이머전시 상황인지 체크하는 flag
-        self.tb_emergency_list = []         # 이머전시 상황에서 가격 리스트
         self.is_TB = False                  # 상단 볼린저 브레이크 확정
 
         # 하단 볼린저 브레이크
+        self.lb_price = 0                   # lb 당시 가격
         self.lb_emergency_flag = False      # 이머전시 상황인지 체크하는 flag
-        self.lb_emergency_list = []         # 이머전시 상황에서 가격 리스트
         self.is_LB = False                  # 하단 볼린저 브레이크 확정
 
-    def init_tb(self):
+    def init_TB(self):
+        """
+        def description : tb 관련 변수 초기화
+
+        """
+        self.tb_price = 0
         self.tb_emergency_flag = False      # 이머전시 상황인지 체크하는 flag
-        self.tb_emergency_list = []         # 이머전시 상황에서 가격 리스트
         self.is_TB = False                  # 상단 볼린저 브레이크 확정
         self.is_now_five = False
 
-    def init_lb(self):
+    def init_LB(self):
+        """
+        def description : lb 관련 변수 초기화
+
+        """
         self.lb_emergency_flag = False
-        self.lb_emergency_list = []
         self.is_LB = False
         self.is_now_five = False
 
-    def start(self, ticker="KRW-BTC"):
+    def start(self, ticker="KRW-BTC", action_state=None):
+        """
+        def description : ac_boll 시작
+
+        Parameters
+        ----------
+        ticker : 티커
+        action_state : 매매 상태 
+
+        buy : 매수 됨
+        sell : 매도 됨
+        None : 미보유
+
+        """
 
         # 데이터 셋팅
         self.ticker = ticker
+        self.action_state = action_state
 
         # start 메세지 전송
-        msg_s = f"fbtt_start start!, ticker : {self.ticker}, started at : {datetime.datetime.now()}"
+        msg_s = f"ac_boll start!, ticker : {self.ticker}, started at : {datetime.datetime.now()}"
         self.slack.post_to_slack(msg_s)
 
         # log 생성
@@ -63,6 +87,11 @@ class AcBoll:
         self.upbit.set_ticker(self.ticker)
 
         while True:
+
+            if self.loop_activate == False:
+                break
+
+            # 현재가 및 볼린저 상태 조회
             self.current_price = self.upbit.get_current_price()
             response = self.upbit.get_bollinger_state(interval="minute5")
 
@@ -73,58 +102,97 @@ class AcBoll:
 
             print(f"current_price : {self.current_price}")
             print(f"bollinger_state : {self.bollinger_state}")
+            print(f"action_state : {self.action_state}")
 
             # bollinger 상태 변경 체크
             if self.bollinger_state != self.bollinger_state_prev:
 
                 # 볼린저 브레이크 초기발생 셋팅
-                self.emergency_early_setter()
+                self.emergency_early_discover()
 
-            # 비상 대응
-            self.emergency_handler()
+            # 볼린저 브레이크 비상 대응
+            self.emergency_observer()
 
-            # end init
+            # 볼린저 브레이크 사후 로직
+            if action_state != None:
+                self.emergency_finisher()
+
+            # end
             self.bollinger_state_prev = self.bollinger_state
             time.sleep(0.5)
 
         # end
         return
 
-    def emergency_early_setter(self):
+    """
+    ===========================================================================
+    Switch
+    ===========================================================================
+    """
+
+    def emergency_early_discover(self):
+        """
+        def description : 비상상황 얼리 셋터
+
+        """
 
         # TB 초기발생 셋팅
         if self.action_state != "buy":
             if self.bollinger_state == "TB":
-                self.emergency_TB_early_set()
+                self.TB_early_discover()
 
         # LB 초기발생 셋팅
         if self.action_state == "buy":
             if self.bollinger_state == "LB":
-                self.emergency_LB_early_set()
+                self.LB_early_discover()
 
-    def emergency_handler(self):
+    def emergency_observer(self):
+        """
+        def description : 비상상황 감시
+
+        """
 
         # TB 비상처리
         if self.action_state != "buy":
             if self.tb_emergency_flag == True:
-                self.emergency_TB()
+                self.TB_observer()
 
         # LB 비상처리
         if self.action_state == "buy":
             if self.lb_emergency_flag == True:
-                self.emergency_LB()
+                self.LB_observer()
 
-    def emergency_TB_early_set(self):
+    def emergency_finisher(self):
         """
-        def description : LB 비상 조기 대응 셋
+        def description : 비상상황 사후처리
+
+        """
+        # 볼린저 브레이크 사후 로직
+        if self.action_state == "buy":
+            self.TB_finisher()
+            pass
+
+        if self.action_state == "sell":
+            # 바닥 짚어 사는 로직 개발 (위험할 수 있으니 보류)
+            pass
+
+    """
+    ===========================================================================
+    TB managing
+    ===========================================================================
+    """
+
+    def TB_early_discover(self):
+        """
+        def description : TB 초기발견 대응로직
 
         """
 
-        # 5분전 종가와 현재가를 입력.
+        # 5분전 종가와 현재가를 입력
         if self.tb_emergency_flag == False:
-            self.tb_emergency_list.append(self.current_price)
-            self.tb_emergency_list.append(
-                self.upbit.get_target_interval_price("minute5"))
+
+            # tb_price 셋팅
+            self.tb_price = self.current_price
 
             # flag 셋팅
             self.tb_emergency_flag = True
@@ -134,9 +202,9 @@ class AcBoll:
             if now_min % 5 == 0:
                 self.is_now_five = True
 
-    def emergency_TB(self):
+    def TB_observer(self):
         """
-        def description : TB 비상 코어
+        def description : TB 감시로직
 
         """
         # 현재 분이 5의 배수가 아닐 때 시행
@@ -145,18 +213,20 @@ class AcBoll:
             # 5분 봉이 갱신 될 때 마다 가격 체크
             now_min = generate_now_min()
             if now_min % 5 == 0:
-                if self.emergency_TB_decider() == True:
+
+                if self.TB_decider() == True:
+
                     msg = f" ticker : {self.ticker}, 천장인거 같은데 사는게 어때?, dated at : {datetime.datetime.now()}"
                     self.slack.post_to_slack(msg)
 
                     self.action_state = "buy"
-                    self.init_tb()  # 초기화
+                    self.is_now_five = True
 
                 else:
                     msg = f" ticker : {self.ticker}, 에이 상승인줄 알았네, dated at : {datetime.datetime.now()}"
                     self.slack.post_to_slack(msg)
 
-                    self.init_tb()  # 초기화
+                    self.init_TB()  # 초기화
 
         # 현재 분이 5의 배수일 때, 1분을 흘려버리고 flag 업데이트
         else:
@@ -164,41 +234,96 @@ class AcBoll:
             if now_min % 5 != 0:
                 self.is_now_five = False
 
-    def emergency_TB_decider(self):
+    def TB_decider(self):
         """
-        def description : TB 비상 결정
+        def description : TB 결정
 
         """
-
         time.sleep(1)
+
         five_min_bp = self.upbit.get_target_interval_price("minute5")
-        self.tb_emergency_list.append(five_min_bp)
+        ten_min_bp = self.upbit.get_target_interval_price("minute10")
 
-        # 5분 전종가, TB 발생시 현재가, 5분 뒤 종가가 정렬 되었는지 확인
-        self.is_TB = True
-        for idx in range(0, len(self.tb_emergency_list)-1):
+        plus_cnt = 0
+        minus_cnt = 0
+        for i in range(0, 30):
+            time.sleep(1)
 
-            p1 = self.tb_emergency_list[idx]
-            p2 = self.tb_emergency_list[idx + 1]
+            if self.current_price > self.tb_price:
+                plus_cnt += 1
 
-            # 중간에 상승이 있으면
-            if p1 > p2:
-                self.is_LB = False
-                break
+            else:
+                minus_cnt += 1
 
-        return self.is_LB
+        self.is_TB = False
+        if five_min_bp > ten_min_bp and\
+                self.current_price > self.tb_price:
 
-    def emergency_LB_early_set(self):
+            self.is_TB = True
+
+        return self.is_TB
+
+    def TB_finisher(self):
         """
-        def description : LB 비상 조기 대응 셋
+        def description : TB 사후처리
+
+        """
+        # 현재 분이 5의 배수가 아닐 때 시행
+        if self.is_now_five == False:
+
+            # 5분 봉이 갱신 될 때 마다 가격 체크
+            now_min = generate_now_min()
+            if now_min % 5 == 0:
+
+                five_min_bp = self.upbit.get_target_interval_price("minute5")
+                ten_min_bp = self.upbit.get_target_interval_price("minute10")
+
+                # CASE 1 . 현재가가 이전 5분봉 상승의 70퍼 지점보다 낮음
+                if self.current_price < five_min_bp:
+                    stand_price = (five_min_bp + ten_min_bp) * 0.7
+
+                    if self.current_price < stand_price:
+                        msg = f" ticker : {self.ticker}, 팔 때 된거 같은데?, dated at : {datetime.datetime.now()}"
+                        self.slack.post_to_slack(msg)
+                        self.action_state = "sell"
+
+                        self.init_TB()  # 초기화
+
+                # CASE 2 . 10분전 종가가 5분전 종가보다 낮음
+                elif five_min_bp < ten_min_bp:
+                    msg = f" ticker : {self.ticker}, 팔 때 된거 같은데?, dated at : {datetime.datetime.now()}"
+                    self.slack.post_to_slack(msg)
+                    self.action_state = "sell"
+
+                    self.init_TB()  # 초기화
+
+                else:
+                    msg = f" ticker : {self.ticker}, 더오르네?, dated at : {datetime.datetime.now()}"
+                    self.slack.post_to_slack(msg)
+
+        # 현재 분이 5의 배수일 때, 1분을 흘려버리고 flag 업데이트
+        else:
+            now_min = generate_now_min()
+            if now_min % 5 != 0:
+                self.is_now_five = False
+
+    """
+    ===========================================================================
+    LB managing
+    ===========================================================================
+    """
+
+    def LB_early_discover(self):
+        """
+        def description : LB 초기 감시 로직
 
         """
 
         # 5분전 종가와 현재가를 입력.
         if self.lb_emergency_flag == False:
-            self.lb_emergency_list.append(self.current_price)
-            self.lb_emergency_list.append(
-                self.upbit.get_target_interval_price("minute5"))
+
+            #
+            self.lb_price = self.current_price
 
             # flag 셋팅
             self.lb_emergency_flag = True
@@ -208,9 +333,9 @@ class AcBoll:
             if now_min % 5 == 0:
                 self.is_now_five = True
 
-    def emergency_LB(self):
+    def LB_observer(self):
         """
-        def description : LB 비상 코어
+        def description : LB 감시 로직
 
         """
 
@@ -220,15 +345,15 @@ class AcBoll:
             # 5분 봉이 갱신 될 때 마다 가격 체크
             now_min = generate_now_min()
             if now_min % 5 == 0:
-                if self.emergency_LB_decider() == True:
+                if self.LB_decider() == True:
                     msg = f" ticker : {self.ticker}, 바닥인거 같은데 파는게 어때?, dated at : {datetime.datetime.now()}"
                     self.slack.post_to_slack(msg)
 
-                    self.init_lb()  # 초기화
+                    self.init_LB()  # 초기화
                     self.action_state = "sell"
 
                 else:
-                    self.init_lb()  # 초기화
+                    self.init_LB()  # 초기화
                     msg = f" ticker : {self.ticker}, 에이 바닥인줄 알았네, dated at : {datetime.datetime.now()}"
                     self.slack.post_to_slack(msg)
 
@@ -238,7 +363,7 @@ class AcBoll:
             if now_min % 5 != 0:
                 self.is_now_five = False
 
-    def emergency_LB_decider(self):
+    def LB_decider(self):
         """
         def description : LB 비상 결정
 
@@ -246,18 +371,23 @@ class AcBoll:
 
         time.sleep(1)
         five_min_bp = self.upbit.get_target_interval_price("minute5")
-        self.lb_emergency_list.append(five_min_bp)
+        ten_min_bp = self.upbit.get_target_interval_price("minute10")
 
-        # 5분 봉들이 하락세인지 체크
-        self.is_LB = True
-        for idx in range(0, len(self.lb_emergency_list)-1):
+        plus_cnt = 0
+        minus_cnt = 0
+        for i in range(0, 30):
+            time.sleep(1)
 
-            p1 = self.lb_emergency_list[idx]
-            p2 = self.lb_emergency_list[idx + 1]
+            if self.current_price > self.tb_price:
+                plus_cnt += 1
 
-            # 중간에 상승이 있으면
-            if p1 < p2:
-                self.is_LB = False
-                break
+            else:
+                minus_cnt += 1
+
+        self.is_LB = False
+        if ten_min_bp > five_min_bp and\
+                self.current_price < self.lb_price:
+
+            self.is_LB = True
 
         return self.is_LB

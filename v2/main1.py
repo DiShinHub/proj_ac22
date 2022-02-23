@@ -23,4 +23,4 @@
 from service.ac_boll import *
 
 ac_boll = AcBoll()
-ac_boll.start(ticker="KRW-SOL")
+ac_boll.start(ticker="KRW-ETH", action_state=None)
